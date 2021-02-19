@@ -9,6 +9,7 @@
 #define CARD_H_
 
 #include "common.h"
+#include "lua_obj.h"
 #include "effectset.h"
 #include "ocgapi.h"
 #include "duel.h"
@@ -61,7 +62,7 @@ struct card_state {
 	void set0xff();
 };
 
-class card {
+class card : public lua_obj_helper<PARAM_TYPE_CARD> {
 public:
 	struct effect_relation_hash {
 		inline std::size_t operator()(const std::pair<effect*, uint16>& v) const {
@@ -99,8 +100,6 @@ public:
 		uint8 location;
 		uint8 sequence;
 	};
-	int32 ref_handle;
-	duel* pduel;
 	card_data data;
 	card_state previous;
 	card_state temp;
@@ -166,6 +165,7 @@ public:
 	bool is_extra_deck_monster() const { return !!(data.type & (TYPE_FUSION | TYPE_SYNCHRO | TYPE_XYZ | TYPE_LINK)) && !!(data.type & TYPE_MONSTER); }
 
 	void get_infos(int32 query_flag);
+	int32 is_related_to_chains();
 	loc_info get_info_location();
 	uint32 second_code(uint32 code);
 	uint32 get_code();
@@ -199,7 +199,7 @@ public:
 	uint32 get_linked_zone(bool free = false);
 	void get_linked_cards(card_set* cset, uint32 zones = 0);
 	uint32 get_mutual_linked_zone();
-	void get_mutual_linked_cards(card_set * cset);
+	void get_mutual_linked_cards(card_set* cset);
 	int32 is_link_state();
 	int32 is_mutual_linked(card* pcard, uint32 zones1 = 0, uint32 zones2 = 0);
 	int32 is_extra_link_state();
@@ -211,12 +211,12 @@ public:
 	void get_column_cards(card_set* cset, int32 left, int32 right);
 	int32 is_all_column();
 
-	void equip(card *target, uint32 send_msg = TRUE);
+	void equip(card* target, uint32 send_msg = TRUE);
 	void unequip();
 	int32 get_union_count();
 	int32 get_old_union_count();
 	void xyz_overlay(card_set* materials);
-	void xyz_add(card* mat, card_set* des);
+	void xyz_add(card* mat);
 	void xyz_remove(card* mat);
 	void apply_field_effect();
 	void cancel_field_effect();
@@ -225,7 +225,7 @@ public:
 	void remove_effect(effect* peffect);
 	void remove_effect(effect* peffect, effect_container::iterator it);
 	int32 copy_effect(uint32 code, uint32 reset, uint32 count);
-	int32 replace_effect(uint32 code, uint32 reset, uint32 count);
+	int32 replace_effect(uint32 code, uint32 reset, uint32 count, bool recreating = false);
 	void reset(uint32 id, uint32 reset_type);
 	void reset_effect_count();
 	void refresh_disable_status();
@@ -316,12 +316,12 @@ public:
 	int32 is_capable_be_battle_target(card* pcard);
 	int32 is_capable_be_effect_target(effect* peffect, uint8 playerid);
 	int32 is_capable_overlay(uint8 playerid);
-	int32 is_can_be_fusion_material(card* fcard, uint32 summon_type);
+	int32 is_can_be_fusion_material(card* fcard, uint64 summon_type, uint8 playerid);
 	int32 is_can_be_synchro_material(card* scard, uint8 playerid, card* tuner = 0);
-	int32 is_can_be_ritual_material(card* scard);
+	int32 is_can_be_ritual_material(card* scard, uint8 playerid);
 	int32 is_can_be_xyz_material(card* scard, uint8 playerid);
 	int32 is_can_be_link_material(card* scard, uint8 playerid);
-	int32 is_can_be_material(card* scard, uint32 sumtype, uint8 playerid);
+	int32 is_can_be_material(card* scard, uint64 sumtype, uint8 playerid);
 	bool recreate(uint32 code);
 };
 

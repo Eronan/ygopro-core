@@ -6,80 +6,53 @@
  */
 #include "scriptlib.h"
 #include "duel.h"
+#include "lua_obj.h"
 
-static int32 check_data_type(lua_State* L, int32 index, const char* tname) {
-	int32 result = FALSE;
-	if(lua_getmetatable(L, index)) {
-		lua_getglobal(L, tname);
-		if(lua_rawequal(L, -1, -2))
-			result = TRUE;
-		lua_pop(L, 2);
-	}
-	return result;
-}
-int32 scriptlib::check_param(lua_State* L, int32 param_type, int32 index, int32 retfalse) {
+int32 scriptlib::check_param(lua_State* L, int32 param_type, int32 index, int32 retfalse, void* retobj) {
+	const char* type = nullptr;
+	lua_obj* obj = nullptr;
 	switch (param_type) {
-	case PARAM_TYPE_CARD: {
-		int32 result = FALSE;
-		if(lua_isuserdata(L, index) && lua_getmetatable(L, index)) {
-			result = check_data_type(L, -1, "Card");
-			lua_pop(L, 1);
+	case PARAM_TYPE_CARD:
+	case PARAM_TYPE_GROUP:
+	case PARAM_TYPE_EFFECT:
+		if((obj = lua_get<lua_obj*>(L, index)) != nullptr && obj->lua_type == param_type) {
+			if(retobj)
+				*(lua_obj**)retobj = obj;
+			return TRUE;
+		} else if(obj && obj->lua_type == PARAM_TYPE_DELETED) {
+			luaL_error(L, "Attempting to access deleted object.");
 		}
-		if(result)
-			return TRUE;
-		if(retfalse)
-			return FALSE;
-		luaL_error(L, "Parameter %d should be \"Card\".", index);
+		type = param_type == PARAM_TYPE_CARD ? "Card" : param_type == PARAM_TYPE_GROUP ? "Group" : "Effect";
 		break;
-	}
-	case PARAM_TYPE_GROUP: {
-		if(lua_isuserdata(L, index) && check_data_type(L, index, "Group"))
-			return TRUE;
-		if(retfalse)
-			return FALSE;
-		luaL_error(L, "Parameter %d should be \"Group\".", index);
-		break;
-	}
-	case PARAM_TYPE_EFFECT: {
-		if(lua_isuserdata(L, index) && check_data_type(L, index, "Effect"))
-			return TRUE;
-		if(retfalse)
-			return FALSE;
-		luaL_error(L, "Parameter %d should be \"Effect\".", index);
-		break;
-	}
-	case PARAM_TYPE_FUNCTION: {
+	case PARAM_TYPE_FUNCTION:
 		if(lua_isfunction(L, index))
 			return TRUE;
-		if(retfalse)
-			return FALSE;
-		luaL_error(L, "Parameter %d should be \"Function\".", index);
+		type = "Function";
 		break;
-	}
-	case PARAM_TYPE_STRING: {
+	case PARAM_TYPE_STRING:
 		if(lua_isstring(L, index))
 			return TRUE;
-		if(retfalse)
-			return FALSE;
-		luaL_error(L, "Parameter %d should be \"String\".", index);
+		type = "String";
 		break;
-	}
-	case PARAM_TYPE_INT: {
+	case PARAM_TYPE_INT:
 		if(lua_isinteger(L, index) || lua_isnumber(L, index))
 			return TRUE;
-		if(retfalse)
-			return FALSE;
-		luaL_error(L, "Parameter %d should be \"Int\".", index);
+		type = "Int";
 		break;
-	}
-	case PARAM_TYPE_BOOLEAN: {
-		if(lua_isboolean(L, index))
+	case PARAM_TYPE_BOOLEAN:
+		if(lua_gettop(L) >= index)
 			return TRUE;
-		if(retfalse)
-			return FALSE;
-		luaL_error(L, "Parameter %d should be \"boolean\".", index);
+		type = "boolean";
 		break;
 	}
+	if(retfalse)
+		return FALSE;
+	if(param_type == PARAM_TYPE_INT) {
+		interpreter::print_stacktrace(L);
+		const auto pduel = lua_get<duel*>(L);
+		pduel->handle_message(pduel->lua->format(R"(Parameter %d should be "%s".)", index, type), OCG_LOG_TYPE_ERROR);
+	} else {
+		luaL_error(L, R"(Parameter %d should be "%s".)", index, type);
 	}
 	return FALSE;
 }
@@ -90,7 +63,7 @@ int32 scriptlib::check_param_count(lua_State* L, int32 count) {
 	return TRUE;
 }
 int32 scriptlib::check_action_permission(lua_State* L) {
-	duel* pduel = interpreter::get_duel_info(L);
+	const auto pduel = lua_get<duel*>(L);
 	if(pduel->lua->no_action)
 		luaL_error(L, "Action is not allowed here.");
 	return TRUE;

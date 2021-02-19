@@ -36,6 +36,7 @@ struct tevent {
 	uint32 reason;
 	uint8 event_player;
 	uint8 reason_player;
+	uint32 global_id;
 	bool operator< (const tevent& v) const;
 };
 struct optarget {
@@ -64,6 +65,7 @@ struct chain {
 	tevent evt;
 	opmap opinfos;
 	uint32 flag;
+	uint32 event_id;
 	static bool chain_operation_sort(const chain& c1, const chain& c2);
 	void set_triggering_state(card* pcard);
 };
@@ -115,12 +117,12 @@ struct field_effect {
 	effect_collection rechargeable;
 	effect_collection spsummon_count_eff;
 
-	std::list<card*> disable_check_list;
 	std::unordered_set<card*> disable_check_set;
 
 	grant_effect_container grant_effect;
 };
 struct field_info {
+	int32 event_id;
 	int32 field_id;
 	int16 copy_id;
 	int16 turn_id;
@@ -180,6 +182,7 @@ struct processor {
 	processor_list units;
 	processor_list subunits;
 	processor_unit reserved;
+	card_set just_sent_cards;
 	card_vector select_cards;
 	card_vector unselect_cards;
 	card_vector summonable_cards;
@@ -202,6 +205,7 @@ struct processor {
 	event_list sub_solving_event;
 	chain_array select_chains;
 	chain_array current_chain;
+	int32 real_chain_count;
 	chain_list tpchain;
 	chain_list ntpchain;
 	chain_array ignition_priority_chains;
@@ -236,7 +240,6 @@ struct processor {
 	card_set release_cards_ex_oneof;
 	card_set battle_destroy_rep;
 	card_set fusion_materials;
-	card_set synchro_materials;
 	card_set operated_set;
 	card_set discarded_set;
 	card_set destroy_canceled;
@@ -269,6 +272,7 @@ struct processor {
 	effect* reason_effect;
 	uint8 reason_player;
 	card* summoning_card;
+	uint32 summoning_proc_group_type;
 	uint8 summon_depth;
 	uint8 summon_cancelable;
 	card* attacker;
@@ -289,7 +293,7 @@ struct processor {
 	int32 summon_count[2];
 	uint8 extra_summon[2];
 	int32 spe_effect[2];
-	int32 duel_options;
+	uint64 duel_options;
 	uint32 copy_reset;
 	uint8 copy_reset_count;
 	uint32 last_control_changed_id;
@@ -402,12 +406,13 @@ public:
 	bool relay_check(uint8 playerid);
 	void next_player(uint8 playerid);
 
-	bool is_flag(int32 flag);
+	bool is_flag(uint64 flag);
 	int32 get_pzone_index(uint8 seq);
 
 	void add_effect(effect* peffect, uint8 owner_player = 2);
 	void remove_effect(effect* peffect);
 	void remove_oath_effect(effect* reason_effect);
+	void release_oath_relation(effect* reason_effect);
 	void reset_phase(uint32 phase);
 	void reset_chain();
 	void add_effect_code(uint32 code, uint32 flag, uint32 playerid);
@@ -428,11 +433,11 @@ public:
 	int32 get_summon_release_list(card* target, card_set* release_list, card_set* ex_list, card_set* ex_list_oneof, group* mg = NULL, uint32 ex = 0, uint32 releasable = 0xff00ff, uint32 pos = 0x1);
 	int32 get_summon_count_limit(uint8 playerid);
 	int32 get_draw_count(uint8 playerid);
-	void get_ritual_material(uint8 playerid, effect* peffect, card_set* material);
+	void get_ritual_material(uint8 playerid, effect* peffect, card_set* material, bool check_level);
 	void get_fusion_material(uint8 playerid, card_set* material);
 	void ritual_release(card_set* material);
-	void get_overlay_group(uint8 self, uint8 s, uint8 o, card_set* pset, group* pgroup);
-	int32 get_overlay_count(uint8 self, uint8 s, uint8 o, group* pgroup);
+	void get_overlay_group(uint8 playerid, uint8 self, uint8 oppo, card_set* pset, group* pgroup);
+	int32 get_overlay_count(uint8 playerid, uint8 self, uint8 oppo, group* pgroup);
 	void update_disable_check_list(effect* peffect);
 	void add_to_disable_check_list(card* pcard);
 	void adjust_disable_check_list();
@@ -455,7 +460,7 @@ public:
 	void restore_lp_cost() {}
 	int32 pay_lp_cost(uint32 step, uint8 playerid, uint32 cost);
 
-	uint32 get_field_counter(uint8 self, uint8 s, uint8 o, uint16 countertype);
+	uint32 get_field_counter(uint8 playerid, uint8 self, uint8 oppo, uint16 countertype);
 	int32 effect_replace_check(uint32 code, const tevent& e);
 	int32 get_attack_target(card* pcard, card_vector* v, uint8 chain_attack = FALSE, bool select_target = true);
 	bool confirm_attack_target();
@@ -481,8 +486,8 @@ public:
 	int32 is_player_can_spsummon_count(uint8 playerid, uint32 count);
 	int32 is_player_can_release(uint8 playerid, card* pcard);
 	int32 is_player_can_place_counter(uint8 playerid, card* pcard, uint16 countertype, uint16 count);
-	int32 is_player_can_remove_counter(uint8 playerid, card* pcard, uint8 s, uint8 o, uint16 countertype, uint16 count, uint32 reason);
-	int32 is_player_can_remove_overlay_card(uint8 playerid, group* pcard, uint8 s, uint8 o, uint16 count, uint32 reason);
+	int32 is_player_can_remove_counter(uint8 playerid, card* pcard, uint8 self, uint8 oppo, uint16 countertype, uint16 count, uint32 reason);
+	int32 is_player_can_remove_overlay_card(uint8 playerid, group* pcard, uint8 self, uint8 oppo, uint16 count, uint32 reason);
 	int32 is_player_can_send_to_grave(uint8 playerid, card* pcard);
 	int32 is_player_can_send_to_hand(uint8 playerid, card* pcard);
 	int32 is_player_can_send_to_deck(uint8 playerid, card* pcard);
@@ -491,11 +496,11 @@ public:
 	int32 is_chain_disablable(uint8 chaincount);
 	int32 is_chain_disabled(uint8 chaincount);
 	int32 check_chain_target(uint8 chaincount, card* pcard);
-	chain* get_chain(uint32 chaincount);
+	chain* get_chain(uint8 chaincount);
 	int32 get_cteffect(effect* peffect, int32 playerid, int32 store);
 	int32 get_cteffect_evt(effect* feffect, int32 playerid, const tevent& e, int32 store);
 	int32 check_cteffect_hint(effect* peffect, uint8 playerid);
-	int32 check_hand_trigger(chain& ch);
+	int32 check_nonpublic_trigger(chain& ch);
 	int32 check_trigger_effect(const chain& ch) const;
 	int32 check_spself_from_hand_trigger(const chain& ch) const;
 	int32 is_able_to_enter_bp();
@@ -529,7 +534,7 @@ public:
 	void solve_continuous(uint8 playerid, effect* peffect, const tevent& e);
 	int32 solve_continuous(uint16 step);
 	int32 solve_chain(uint16 step, uint32 chainend_arg1, uint32 chainend_arg2);
-	int32 break_effect();
+	int32 break_effect(bool clear_sent = true);
 	void adjust_instant();
 	void adjust_all();
 	void refresh_location_info_instant();
@@ -544,8 +549,8 @@ public:
 	void change_target(uint8 chaincount, group* targets);
 	void change_target_player(uint8 chaincount, uint8 playerid);
 	void change_target_param(uint8 chaincount, int32 param);
-	void remove_counter(uint32 reason, card* pcard, uint32 rplayer, uint32 s, uint32 o, uint32 countertype, uint32 count);
-	void remove_overlay_card(uint32 reason, group* pgroup, uint32 rplayer, uint32 s, uint32 o, uint16 min, uint16 max);
+	void remove_counter(uint32 reason, card* pcard, uint32 rplayer, uint8 self, uint8 oppo, uint32 countertype, uint32 count);
+	void remove_overlay_card(uint32 reason, group* pgroup, uint32 rplayer, uint8 self, uint8 oppo, uint16 min, uint16 max);
 	void get_control(card_set* targets, effect* reason_effect, uint32 reason_player, uint32 playerid, uint32 reset_phase, uint32 reset_count, uint32 zone);
 	void get_control(card* target, effect* reason_effect, uint32 reason_player, uint32 playerid, uint32 reset_phase, uint32 reset_count, uint32 zone);
 	void swap_control(effect* reason_effect, uint32 reason_player, card_set* targets1, card_set* targets2, uint32 reset_phase, uint32 reset_count);
@@ -557,6 +562,7 @@ public:
 	void summon(uint32 sumplayer, card* target, effect* proc, uint32 ignore_count, uint32 min_tribute, uint32 zone = 0x1f);
 	void mset(uint32 setplayer, card* target, effect* proc, uint32 ignore_count, uint32 min_tribute, uint32 zone = 0x1f);
 	void special_summon_rule(uint32 sumplayer, card* target, uint32 summon_type);
+	void special_summon_rule_group(uint32 sumplayer, uint32 summon_type);
 	void special_summon(card_set* target, uint32 sumtype, uint32 sumplayer, uint32 playerid, uint32 nocheck, uint32 nolimit, uint32 positions, uint32 zone);
 	void special_summon_step(card* target, uint32 sumtype, uint32 sumplayer, uint32 playerid, uint32 nocheck, uint32 nolimit, uint32 positions, uint32 zone);
 	void special_summon_complete(effect* reason_effect, uint8 reason_player);
@@ -566,7 +572,7 @@ public:
 	void release(card* target, effect* reason_effect, uint32 reason, uint32 reason_player);
 	void send_to(card_set* targets, effect* reason_effect, uint32 reason, uint32 reason_player, uint32 playerid, uint32 destination, uint32 sequence, uint32 position, uint32 ignore = false);
 	void send_to(card* target, effect* reason_effect, uint32 reason, uint32 reason_player, uint32 playerid, uint32 destination, uint32 sequence, uint32 position, uint32 ignore = false);
-	void move_to_field(card* target, uint32 move_player, uint32 playerid, uint32 destination, uint32 positions, uint8 enable = FALSE, uint32 ret = 0, uint8 is_equip = FALSE, uint32 zone = 0xff, uint8 rule = FALSE, uint32 reason = 0, uint8 confirm = TRUE);
+	void move_to_field(card* target, uint32 move_player, uint32 playerid, uint32 destination, uint32 positions, uint8 enable = FALSE, uint8 ret = 0, uint8 zone = 0xff, uint8 rule = FALSE, uint8 reason = 0, uint8 confirm = TRUE);
 	void change_position(card_set* targets, effect* reason_effect, uint32 reason_player, uint32 au, uint32 ad, uint32 du, uint32 dd, uint32 flag, uint32 enable = FALSE);
 	void change_position(card* target, effect* reason_effect, uint32 reason_player, uint32 npos, uint32 flag, uint32 enable = FALSE);
 	void operation_replace(int32 type, int32 step, group* targets);
@@ -574,7 +580,7 @@ public:
 
 	int32 remove_counter(uint16 step, uint32 reason, card* pcard, uint8 rplayer, uint8 s, uint8 o, uint16 countertype, uint16 count);
 	int32 remove_overlay_card(uint16 step, uint32 reason, group* pgroup, uint8 rplayer, uint8 s, uint8 o, uint16 min, uint16 max);
-	int32 get_control(uint16 step, effect* reason_effect, uint8 reason_player, group* targets, uint8 playerid, uint16 reset_phase, uint8 reset_count, uint32 zone);
+	int32 get_control(uint16 step, effect* reason_effect, uint8 chose_player, group* targets, uint8 playerid, uint16 reset_phase, uint8 reset_count, uint32 zone);
 	int32 swap_control(uint16 step, effect* reason_effect, uint8 reason_player, group* targets1, group* targets2, uint16 reset_phase, uint8 reset_count);
 	int32 control_adjust(uint16 step);
 	int32 self_destroy(uint16 step, card* ucard, int32 p);
@@ -588,6 +594,7 @@ public:
 	int32 sset(uint16 step, uint8 setplayer, uint8 toplayer, card* ptarget, effect* reason_effect);
 	int32 sset_g(uint16 step, uint8 setplayer, uint8 toplayer, group* ptarget, uint8 confirm, effect* reason_effect);
 	int32 special_summon_rule(uint16 step, uint8 sumplayer, card* target, uint32 summon_type);
+	int32 special_summon_rule_group(uint16 step, uint8 sumplayer, uint32 summon_type);
 	int32 special_summon_step(uint16 step, group* targets, card* target, uint32 zone);
 	int32 special_summon(uint16 step, effect* reason_effect, uint8 reason_player, group* targets, uint32 zone);
 	int32 destroy_replace(uint16 step, group* targets, card* target, uint8 battle);
@@ -597,7 +604,7 @@ public:
 	int32 send_replace(uint16 step, group* targets, card* target);
 	int32 send_to(uint16 step, group* targets, effect* reason_effect, uint32 reason, uint8 reason_player);
 	int32 discard_deck(uint16 step, uint8 playerid, uint8 count, uint32 reason);
-	int32 move_to_field(uint16 step, card* target, uint32 enable, uint32 ret, uint32 is_equip, uint32 zone, uint8 pzone = FALSE, uint8 rule = FALSE, uint32 reason = 0, uint8 confirm = TRUE);
+	int32 move_to_field(uint16 step, card* target, uint8 enable, uint8 ret, uint8 pzone, uint8 zone, uint8 rule = FALSE, uint8 reason = 0, uint8 confirm = TRUE);
 	int32 change_position(uint16 step, group* targets, effect* reason_effect, uint8 reason_player, uint32 enable);
 	int32 operation_replace(uint16 step, effect* replace_effect, group* targets, card* target, int32 is_destroy);
 	int32 activate_effect(uint16 step, effect* peffect);
@@ -612,8 +619,8 @@ public:
 	int32 select_effect_yes_no(uint16 step, uint8 playerid, uint64 description, card* pcard);
 	int32 select_yes_no(uint16 step, uint8 playerid, uint64 description);
 	int32 select_option(uint16 step, uint8 playerid);
-	bool parse_response_cards(uint8 cancelable = FALSE);
-	int32 select_card(uint16 step, uint8 playerid, uint8 cancelable, uint8 min, uint8 max);
+	bool parse_response_cards(uint8 cancelable = FALSE, uint8 sort = TRUE);
+	int32 select_card(uint16 step, uint8 playerid, uint8 cancelable, uint8 min, uint8 max, uint8 use_code);
 	int32 select_unselect_card(uint16 step, uint8 playerid, uint8 cancelable, uint8 min, uint8 max, uint8 finishable);
 	int32 select_chain(uint16 step, uint8 playerid, uint8 spe_count, uint8 forced);
 	int32 select_place(uint16 step, uint8 playerid, uint32 flag, uint8 count);
@@ -764,6 +771,7 @@ public:
 #define PROCESSOR_SSET				65
 #define PROCESSOR_SPSUMMON_STEP		66
 #define PROCESSOR_SSET_G			67
+#define PROCESSOR_SPSUMMON_RULE_G	68
 #define PROCESSOR_DRAW				70
 #define PROCESSOR_DAMAGE			71
 #define PROCESSOR_RECOVER			72

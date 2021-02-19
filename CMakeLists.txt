@@ -8,6 +8,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(OCGCORE_MSVC_STATIC "Static CRT on Visual Studio" ON)
+option(OCGCORE_OLD_WINDOWS "Tricks to support up to windows 2000" OFF)
 
 find_package(Lua REQUIRED)
 
@@ -23,14 +24,19 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 target_include_directories(ocgcore PUBLIC ${LUA_INCLUDE_DIR})
 target_include_directories(ocgcore_static PUBLIC ${LUA_INCLUDE_DIR})
-if(MSVC)
-	find_library(LUA_CXX_LIBRARIES lua-c++)
+
+find_library(LUA_CXX_LIBRARIES lua-c++)
+if(LUA_CXX_LIBRARIES)
 	message("Lua-C++ found at " ${LUA_CXX_LIBRARIES})
 	target_link_libraries(ocgcore PUBLIC ${LUA_CXX_LIBRARIES})
+else()
+	message("Lua-C++ not found, using regular lib.")
+	target_link_libraries(ocgcore PUBLIC ${LUA_LIBRARIES})
+endif()
+
+if(MSVC)
 	target_compile_definitions(ocgcore PRIVATE _CRT_SECURE_NO_WARNINGS)
 	target_compile_definitions(ocgcore_static PRIVATE _CRT_SECURE_NO_WARNINGS)
-else()
-	target_link_libraries(ocgcore PUBLIC ${LUA_LIBRARIES})
 endif()
 
 set(CLANG_OR_GNU $<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:AppleClang>>)
@@ -74,8 +80,14 @@ set(OCGCORE_SOURCE
 	scriptlib.cpp
 	scriptlib.h)
 
+if(OCGCORE_OLD_WINDOWS AND MSVC)
+	set(OLD_WINDOWS_SOURCES
+		overwrites/loader.asm
+		overwrites/overwrites.cpp)
+endif()
+
 target_sources(ocgcore_static PRIVATE ${OCGCORE_SOURCE})
-target_sources(ocgcore PRIVATE ${OCGCORE_SOURCE})
+target_sources(ocgcore PRIVATE ${OCGCORE_SOURCE} ${OLD_WINDOWS_SOURCES})
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ocgcore)
 if(OCGCORE_MSVC_STATIC AND MSVC)
@@ -92,4 +104,13 @@ if(OCGCORE_MSVC_STATIC AND MSVC)
 	endforeach()
 	# CMake 3.15
 	# set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+if(OCGCORE_OLD_WINDOWS AND MSVC)
+ENABLE_LANGUAGE(ASM_MASM)
+set_source_files_properties(
+    overwrites/loader.asm
+    PROPERTIES
+    COMPILE_FLAGS "/safeseh"
+)
+
 endif()

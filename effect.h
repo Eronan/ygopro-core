@@ -9,6 +9,7 @@
 #define EFFECT_H_
 
 #include "common.h"
+#include "lua_obj.h"
 #include "field.h"
 #include <stdlib.h>
 #include <vector>
@@ -17,15 +18,12 @@
 class card;
 class duel;
 class group;
-class effect;
 struct tevent;
 enum effect_flag : uint32;
 enum effect_flag2 : uint32;
 
-class effect {
+class effect : public lua_obj_helper<PARAM_TYPE_EFFECT> {
 public:
-	int32 ref_handle;
-	duel* pduel;
 	card* owner;
 	card* handler;
 	uint8 effect_owner;
@@ -70,6 +68,7 @@ public:
 	int32 check_count_limit(uint8 playerid);
 	int32 is_activateable(uint8 playerid, const tevent& e, int32 neglect_cond = FALSE, int32 neglect_cost = FALSE, int32 neglect_target = FALSE, int32 neglect_loc = FALSE, int32 neglect_faceup = FALSE);
 	int32 is_action_check(uint8 playerid);
+	int32 is_activate_ready(effect* reason_effect, uint8 playerid, const tevent& e, int32 neglect_cond = FALSE, int32 neglect_cost = FALSE, int32 neglect_target = FALSE);
 	int32 is_activate_ready(uint8 playerid, const tevent& e, int32 neglect_cond = FALSE, int32 neglect_cost = FALSE, int32 neglect_target = FALSE);
 	int32 is_condition_check(uint8 playerid, const tevent& e);
 	int32 is_activate_check(uint8 playerid, const tevent& e, int32 neglect_cond = FALSE, int32 neglect_cost = FALSE, int32 neglect_target = FALSE);
@@ -102,11 +101,11 @@ public:
 	void set_activate_location();
 	void set_active_type();
 	uint32 get_active_type();
-	bool is_flag(effect_flag flag) const {
-		return !!(this->flag[0] & flag);
+	bool is_flag(effect_flag _flag) const {
+		return !!(this->flag[0] & _flag);
 	}
-	bool is_flag(effect_flag2 flag) const {
-		return !!(this->flag[1] & flag);
+	bool is_flag(effect_flag2 _flag) const {
+		return !!(this->flag[1] & _flag);
 	}
 };
 
@@ -197,6 +196,7 @@ enum effect_flag : uint32 {
 enum effect_flag2 : uint32 {
 //	EFFECT_FLAG2_NAGA               = 0x0001,
 	EFFECT_FLAG2_COF                = 0x0002,
+	EFFECT_FLAG2_CHECK_SIMULTANEOUS = 0x0004,
 	EFFECT_FLAG2_MAJESTIC_MUST_COPY = 0x80000000,
 };
 inline effect_flag operator|(effect_flag flag1, effect_flag flag2)
@@ -277,6 +277,7 @@ inline effect_flag operator|(effect_flag flag1, effect_flag flag2)
 #define EFFECT_GEMINI_STATUS                75
 #define EFFECT_EQUIP_LIMIT                  76
 #define EFFECT_GEMINI_SUMMONABLE            77
+#define EFFECT_UNION_LIMIT                  78
 #define EFFECT_REVERSE_DAMAGE               80
 #define EFFECT_REVERSE_RECOVER              81
 #define EFFECT_CHANGE_DAMAGE                82
@@ -360,6 +361,7 @@ inline effect_flag operator|(effect_flag flag1, effect_flag flag2)
 // #define EFFECT_MUST_BE_ATTACKED          195
 #define EFFECT_ONLY_BE_ATTACKED             196
 #define EFFECT_ATTACK_DISABLED              197
+#define EFFECT_CHANGE_BATTLE_STAT           198
 #define EFFECT_NO_BATTLE_DAMAGE             200
 #define EFFECT_AVOID_BATTLE_DAMAGE          201
 #define EFFECT_REFLECT_BATTLE_DAMAGE        202
@@ -442,7 +444,6 @@ inline effect_flag operator|(effect_flag flag1, effect_flag flag2)
 #define EFFECT_REMOVE_SETCODE               349
 #define EFFECT_CHANGE_SETCODE               350
 #define EFFECT_EXTRA_FUSION_MATERIAL        352
-#define EFFECT_TUNER_MATERIAL_LIMIT         353
 #define EFFECT_EXTRA_PENDULUM_SUMMON        360
 #define EFFECT_IRON_WALL                    361
 #define EFFECT_CANNOT_LOSE_DECK             400
@@ -492,6 +493,7 @@ inline effect_flag operator|(effect_flag flag1, effect_flag flag2)
 #define EVENT_DESTROYED             1029
 #define EVENT_MOVE                  1030
 #define EVENT_ADJUST                1040
+#define EVENT_BREAK_EFFECT          1050
 #define EVENT_SUMMON_SUCCESS        1100
 #define EVENT_FLIP_SUMMON_SUCCESS   1101
 #define EVENT_SPSUMMON_SUCCESS      1102
@@ -532,7 +534,6 @@ inline effect_flag operator|(effect_flag flag1, effect_flag flag2)
 #define EVENT_LEVEL_UP              1200
 #define EVENT_PAY_LPCOST            1201
 #define EVENT_DETACH_MATERIAL       1202
-#define EVENT_RETURN_TO_GRAVE       1203
 #define EVENT_TURN_END              1210
 #define EVENT_PHASE                 0x1000
 #define EVENT_PHASE_START           0x2000
